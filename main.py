@@ -83,8 +83,5 @@ async def get_exchange(handler):
 
 
 if __name__ == '__main__':
-    # res, curr = handle_input()
-    # print(res, curr)
-
     result = asyncio.run(get_exchange(handle_output))
     pprint.pp(result, indent=1)
