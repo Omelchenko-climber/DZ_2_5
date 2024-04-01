@@ -12,7 +12,7 @@ URL_PB = "https://api.privatbank.ua/p24api/exchange_rates"
 
 
 async def fetch_exchange_rate(session, date):
-    url = get_right_url(date)
+    url = get_right_url(URL_PB, date)
     try:
         async with session.get(url) as response:
             if response.ok:
@@ -28,36 +28,46 @@ async def fetch_exchange_rate(session, date):
 
 
 async def request():
-    days = handle_days()
+    days, _ = handle_input()
     async with aiohttp.ClientSession() as session:
         tasks = [fetch_exchange_rate(session, datetime.now() - timedelta(days=i)) for i in range(days)]
         result = await asyncio.gather(*tasks)
         return result
 
 
-def handle_days():
+def handle_input():
     parser = argparse.ArgumentParser(description="Get exchange rate for the last N days.")
-    parser.add_argument("days", type=int, help="Number of days to get exchange rates (for up to 10).")
+    parser.add_argument("-d",  "--days", type=int, help="Number of days to get exchange rates (for up to 10).")
+    parser.add_argument("-c", "--currency", nargs="+", default=["USD", "EUR"], type=str, help="You can get EUR, USD\
+    exchangerate by default or choose another currency.")
     args = parser.parse_args()
 
-    if args.days > 10 or args.days < 1:
+    if args.days == None:
+        print("Use -h flag.")
+        sys.exit()
+    elif args.days > 10 or args.days < 1 :
         print("Number of days cannot be less than 1 and exceed 10.")
         sys.exit()
+    elif args.currency:
+        return args.days, args.currency
     else:
+        print(args)
         return args.days
 
+def get_right_url(url, date):
+    return f"{url}?json&date={date.strftime('%d.%m.%Y')}"
 
-def get_right_url(date):
-    return f"{URL_PB}?json&date={date.strftime('%d.%m.%Y')}"
 
-
-def request_handler(result):
+def handle_output(result, another_curr=None):
+    _, list_currency = handle_input()
+    if another_curr:
+        list_currency += another_curr
     ex_cur = {}
     res = []
     for day in result:
         ex_cur[day['date']] = {}
         for cur in day['exchangeRate']:
-            if cur["currency"] in ["EUR", "USD"]:
+            if cur["currency"] in list_currency:
                 ex_cur[day["date"]].update({
                     cur["currency"]: {"sale": cur["saleRateNB"], "purchase": cur["purchaseRateNB"]}})
 
@@ -73,6 +83,8 @@ async def get_exchange(handler):
 
 
 if __name__ == '__main__':
+    # res, curr = handle_input()
+    # print(res, curr)
 
-    result = asyncio.run(get_exchange(request_handler))
+    result = asyncio.run(get_exchange(handle_output))
     pprint.pp(result, indent=1)
